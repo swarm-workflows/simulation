@@ -1,0 +1,6 @@
+agentpy
+pandas
+numpy
+equinox
+diffrax
+torch==1.13.1
