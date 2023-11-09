@@ -93,5 +93,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model = ResourceAllocationModel(num_cpu=args.num_cpu, num_gpu=args.num_gpu, num_nvme=args.num_nvme,
                                     num_agents=args.num_agents)
+
+    start = datetime.now()
     results = model.run(steps=args.steps)
     # Results analysis here
+    print(f"Simulation completed in : {(datetime.now()-start).total_seconds()}")

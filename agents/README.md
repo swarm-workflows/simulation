@@ -44,6 +44,6 @@ Steps for each of the runs below: 100
 
 Number of Agents | AgentPy Time(s) | Repast4py Time(s)
 ---|---|---
-100|  | 160.388634
+100|  157.350244 | 160.388634
 500|  | | 908.729727
 1000| | | 1646.348326
