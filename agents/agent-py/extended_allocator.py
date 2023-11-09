@@ -1,7 +1,5 @@
 import argparse
-import time
 from datetime import datetime
-import concurrent.futures
 import agentpy as ap
 import random
 
