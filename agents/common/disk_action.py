@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-from action import Action
+from .action import Action
 
 
 class DiskAction(Action):

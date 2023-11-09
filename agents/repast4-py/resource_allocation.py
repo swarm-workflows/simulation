@@ -1,5 +1,5 @@
 from mpi4py import MPI
-from repast4py import core, random, space, schedule, logging, parameters
+from repast4py import core, space, schedule
 import random as rr
 
 
