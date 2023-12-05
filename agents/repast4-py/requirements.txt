@@ -3,3 +3,6 @@ mpi4py
 networkx
 pandas
 numpy
+equinox
+diffrax
+torch==1.13.1

@@ -1,4 +1,5 @@
 # Sourced from https://gist.github.com/thomasbrandon/a1e126de770c7e04f8d71a7dc971cfb7
+import random
 
 import numpy as np
 from math import ceil
@@ -146,9 +147,23 @@ def profile(func, *funcargs, device='cpu', wait=False, n_repeats=100, total=Fals
 
 
 class STFTUtils:
+    SAMPLE_CACHE = {}
+
     @staticmethod
-    def __get_samples(num, length, dtype=np.float32):
-        return [np.random.random((ceil(length))).astype(dtype) for _ in range(num)]
+    def initialize(bs=64, length=50 * 1024, dtype=np.float32):
+        if bs not in STFTUtils.SAMPLE_CACHE:
+            STFTUtils.SAMPLE_CACHE[bs] = []
+
+        for x in range(1000):
+            STFTUtils.SAMPLE_CACHE[bs].append([np.random.random((ceil(length))).astype(dtype) for _ in range(bs)])
+
+    @staticmethod
+    def __get_samples(num, length=50 * 1024, dtype=np.float32):
+        # Use sample cache
+        if num in STFTUtils.SAMPLE_CACHE:
+            return random.choice(STFTUtils.SAMPLE_CACHE[num])
+        else:
+            return [np.random.random((ceil(length))).astype(dtype) for _ in range(num)]
 
     @staticmethod
     def torch_stft(bs=64, sample_len=50 * 1024, n_fft=2048, win_length=512, copyto=False, copyfrom=False,
