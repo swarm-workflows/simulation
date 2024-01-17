@@ -58,7 +58,7 @@ if __name__ == '__main__':
     job_queue = JobQueue.get()
 
     # Add jobs to the queue
-    job1 = Job(resources={"cpus": 1, "gpus": 1, "nic_cards": 0}, commands=[f"python3 -m agents.jobs.cpu_computation"])
+    job1 = Job(resources={"cpus": 1, "gpus": 0, "nic_cards": 0}, commands=[f"python3 -m agents.jobs.cpu_computation"])
     job2 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 0}, commands=[f"python3 -m agents.jobs.cpu_computation"])
     job3 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 1}, commands=[f"python3 {scripts_dir}/server.py 1 localhost 12345"])
     job4 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 1}, commands=[f"python3 {scripts_dir}/client.py localhost 12345"])
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    resources = [{"cpus": [1, 2], "gpus": ["gpu1", "gpu2"], "nic_cards": ["localhost"]},
+    resources = [{"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
