@@ -1,9 +1,8 @@
-import subprocess
-import psutil
 import time
 
 from mpi4py import MPI
 from repast4py.network import UndirectedSharedNetwork
+from repast4py.schedule import Schedule, PriorityType
 
 from agents.simulation.job_queue import JobQueue, Job
 from agents.simulation.base_agent import BaseAgent, AgentType
@@ -40,8 +39,11 @@ class ResourceAgent(BaseAgent):
                     print(f"Command: {command} executed with return code: {return_code}, "
                           f"Elapsed Time: {elapsed_time:.2f} seconds")
 
-                print(f"Job: {job_found} completed, Total Execution Time: {total_execution_time:.2f} seconds")
                 JobQueue.get().mark_job_completed(job_found)
+                print(f"{job_found} completed, Total Execution Time: {total_execution_time:.2f} seconds")
+                print()
+                print()
+
                 self.jobs_executed += 1
             except Exception as e:
                 print(f"Error executing job: {job_found}, Error: {e}")
@@ -54,23 +56,28 @@ if __name__ == '__main__':
 
     scripts_dir = "/root/swarm-agents/agents/jobs/"
 
+    num_agents = 5
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
     # Create a job queue
     job_queue = JobQueue.get()
 
     # Add jobs to the queue
     job1 = Job(resources={"cpus": 1, "gpus": 0, "nic_cards": 0}, commands=[f"python3 -m agents.jobs.cpu_computation"])
     job2 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 0}, commands=[f"python3 -m agents.jobs.cpu_computation"])
-    job3 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 1}, commands=[f"python3 {scripts_dir}/server.py 1 localhost 12345"])
+    job3 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 1}, commands=[f"python3 {scripts_dir}/server.py localhost 12345 1"])
     job4 = Job(resources={"cpus": 2, "gpus": 0, "nic_cards": 1}, commands=[f"python3 {scripts_dir}/client.py localhost 12345"])
     job_queue.add_job(job1)
     job_queue.add_job(job2)
-    job_queue.add_job(job3)
-    job_queue.add_job(job4)
+    if rank == 0:
+        job_queue.add_job(job3)
+        print(f"KOMAL --- Rank: 0 {job_queue}")
+    else:
+        job_queue.add_job(job4)
+        print(f"KOMAL --- Rank: 1 {job_queue}")
 
-    num_agents = 5
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
     resources = [{"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
@@ -80,8 +87,16 @@ if __name__ == '__main__':
     network = UndirectedSharedNetwork('resource_agent_nw', comm)
     network.add_nodes(agents=agents)
 
-    for a in agents:
-        a.step()
+    scheduler = Schedule()
+    for agent in agents:
+        scheduler.schedule_repeating_event(1.0, 1.0, lambda agent=agent: agent.step(),
+                                           priority_type=PriorityType.RANDOM)
+
+    steps = 10
+    for _ in range(steps):
+        scheduler.execute()
+
+    comm.Barrier()
 
     # Print the state of jobs in the queues
     print("Pending Jobs:", [str(job) for job in job_queue.pending_queue])

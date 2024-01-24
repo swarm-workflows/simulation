@@ -116,7 +116,7 @@ Parallel Computing | Implementation dependent | Supported | Implementation depen
 Data Visualization |  Visualization tools | Visualization tools | Implementation dependent | Implementation dependent | Real time, Visualization tools | Visualization tools
 Experiment Design | Supported | Supported | Supported | Supported | Supported | Supported
 Community Support |Dependent on adoption |Active community |Limited |Active community |Active community |Active community 
-Data Analysis | Tools available | Tools available| Limited| Tools available
+Data Analysis | Tools available | | |Tools available| Limited| Tools available
 Extensibility | Custom libraries, extensions |Custom libraries, extensions|Basic, left to implementation|Custom libraries, extensions|Custom libraries, extensions|Custom libraries, extensions
 Learning Curve |Beginner to Intermediate |Moderate |Moderate |Moderate |Moderate |Moderate
 Scalability |Varies, implementation dependent| Moderate to High |Limited to Moderate ||Moderate |Moderate |High
