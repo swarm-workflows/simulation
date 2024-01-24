@@ -1,13 +1,11 @@
 import time
-
 from mpi4py import MPI
 from repast4py.network import UndirectedSharedNetwork
 from repast4py.schedule import Schedule, PriorityType
 
-from agents.simulation.job_queue import JobQueue, Job
-from agents.simulation.base_agent import BaseAgent, AgentType
-from agents.simulation.task_executor import TaskExecutor
-
+from simulation.job_queue import JobQueue, Job
+from simulation.base_agent import BaseAgent, AgentType
+from simulation.task_executor import TaskExecutor
 
 class ResourceAgent(BaseAgent):
     def __init__(self, agent_id: int, agent_type: AgentType, rank: int, resources: dict):
@@ -16,6 +14,12 @@ class ResourceAgent(BaseAgent):
         self.msgs_rcvd_cnt = 0
         self.msgs_sent_cnt = 0
         self.jobs_executed = 0
+        self.child_agents = []  # List to keep track of child agents
+
+    def allocate_resources(self, job: Job):
+        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.rank, job.resources)
+        self.child_agents.append(child_agent)
+        return child_agent
 
     def find_and_execute_job(self):
         job_found = JobQueue.get().find_matching_job(agent_resources=self.resources)
@@ -26,30 +30,40 @@ class ResourceAgent(BaseAgent):
             try:
                 total_execution_time = 0.0
 
-                # Run the job commands sequentially
-                for command in job_found.get_commands():
-                    start_time = time.time()
+                # Check if child agents need to be spawned
+                if job_found.resources != self.resources:
+                    child_agent = self.allocate_resources(job_found)
+                    child_agent.find_and_execute_job()  # Execute the job using the child agent
+                else:
+                    # Run the job commands sequentially
+                    for command in job_found.get_commands():
+                        start_time = time.time()
 
-                    return_code = TaskExecutor.run_command(command, cpus=[1])
+                        return_code = TaskExecutor.run_command(command, cpus=self.resources.get("cpus", []))
 
-                    end_time = time.time()
-                    elapsed_time = end_time - start_time
-                    total_execution_time += elapsed_time
+                        end_time = time.time()
+                        elapsed_time = end_time - start_time
+                        total_execution_time += elapsed_time
 
-                    print(f"Command: {command} executed with return code: {return_code}, "
-                          f"Elapsed Time: {elapsed_time:.2f} seconds")
+                        print(f"Command: {command} executed with return code: {return_code}, "
+                              f"Elapsed Time: {elapsed_time:.2f} seconds")
 
-                JobQueue.get().mark_job_completed(job_found)
-                print(f"{job_found} completed, Total Execution Time: {total_execution_time:.2f} seconds")
-                print()
-                print()
+                    JobQueue.get().mark_job_completed(job_found)
+                    print(f"{job_found} completed, Total Execution Time: {total_execution_time:.2f} seconds")
+                    print()
+                    print()
 
-                self.jobs_executed += 1
+                    self.jobs_executed += 1
             except Exception as e:
                 print(f"Error executing job: {job_found}, Error: {e}")
 
     def step(self):
         self.find_and_execute_job()
+        # Check and collect resources from child agents
+        for child_agent in self.child_agents:
+            child_agent.find_and_execute_job()  # Execute jobs using child agents
+            # Collect resources back from child agent (assuming all resources go back to the parent)
+            self.resources = child_agent.resources
 
 
 if __name__ == '__main__':
