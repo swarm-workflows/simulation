@@ -7,6 +7,7 @@ from simulation.job_queue import JobQueue, Job
 from simulation.base_agent import BaseAgent, AgentType
 from simulation.task_executor import TaskExecutor
 
+
 class ResourceAgent(BaseAgent):
     def __init__(self, agent_id: int, agent_type: AgentType, rank: int, resources: dict):
         super().__init__(agent_id, agent_type, rank)
@@ -17,7 +18,7 @@ class ResourceAgent(BaseAgent):
         self.child_agents = []  # List to keep track of child agents
 
     def allocate_resources(self, job: Job):
-        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.rank, job.resources)
+        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.uid_rank, job.resources)
         self.child_agents.append(child_agent)
         return child_agent
 

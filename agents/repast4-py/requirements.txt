@@ -7,3 +7,4 @@ equinox
 diffrax
 torch==1.13.1
 psutil
+confluent-kafka
