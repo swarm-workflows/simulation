@@ -106,6 +106,11 @@ project requirements and were explored in depth. More details for AgentPy and Re
 - **Cross-Platform Compatibility**: Works across various operating systems.
 
 ### Comparison
+<style scoped>
+table {
+  font-size: 16px;
+}
+</style>
 Feature | Agent-Py | Mesa | AgentVerse | Autogen | Gama | Repast 
 --- | --- | --- | --- |--- |--- |--- 
 **Language** | Python | Python | Python | Python | GAMA(Domain Specific language) | Java/Python/C++
