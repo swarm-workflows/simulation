@@ -19,8 +19,12 @@ sudo pip3 install -r agents/agent-py/requirements.txt
 ### Repast4py
 It requires MPI and repast4py to be installed. Following steps can be used to install MPI and repast4py.
 ```
+sudo apt update -y
+sudo apt-get -y install python3-pip
 sudo pip3 install jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 sudo apt install mpich
+sudo apt install python3.10-dev
+sudo apt install libopenmpi-dev
 sudo env CC=mpicxx pip3 install repast4py
 sudo pip3 install -r agents/repast4-py/requirements.txt
 ```

@@ -106,18 +106,23 @@ project requirements and were explored in depth. More details for AgentPy and Re
 - **Cross-Platform Compatibility**: Works across various operating systems.
 
 ### Comparison
+<style scoped>
+table {
+  font-size: 16px;
+}
+</style>
 Feature | Agent-Py | Mesa | AgentVerse | Autogen | Gama | Repast 
 --- | --- | --- | --- |--- |--- |--- 
-Language | Python | Python | Python | Python | GAMA(Domain Specific language) | Java/Python/C++
-Modeling Interface |  Python | Python/GUI |API | API | Graphical |Graphical/API
-Spatial Modeling | Supported | Supported | Implementation dependent | Supported | Supported | Supported
-Custom Behaviors | Supported | Supported | Implementation dependent | Supported | Supported | Supported
-Parallel Computing | Implementation dependent | Supported | Implementation dependent | Implementation dependent | Limited | Supported
-Data Visualization |  Visualization tools | Visualization tools | Implementation dependent | Implementation dependent | Real time, Visualization tools | Visualization tools
-Experiment Design | Supported | Supported | Supported | Supported | Supported | Supported
-Community Support |Dependent on adoption |Active community |Limited |Active community |Active community |Active community 
-Data Analysis | Tools available | Tools available| Limited| Tools available
-Extensibility | Custom libraries, extensions |Custom libraries, extensions|Basic, left to implementation|Custom libraries, extensions|Custom libraries, extensions|Custom libraries, extensions
-Learning Curve |Beginner to Intermediate |Moderate |Moderate |Moderate |Moderate |Moderate
-Scalability |Varies, implementation dependent| Moderate to High |Limited to Moderate ||Moderate |Moderate |High
+**Language** | Python | Python | Python | Python | GAMA(Domain Specific language) | Java/Python/C++
+**Modeling Interface** |  Python | Python/GUI |API | API | Graphical |Graphical/API
+**Spatial Modeling** | Supported | Supported | Implementation dependent | Supported | Supported | Supported
+**Custom Behaviors** | Supported | Supported | Implementation dependent | Supported | Supported | Supported
+**Parallel Computing** | Implementation dependent | Supported | Implementation dependent | Implementation dependent | Limited | Supported
+**Data Visualization** |  Visualization tools | Visualization tools | Implementation dependent | Implementation dependent | Real time, Visualization tools | Visualization tools
+**Experiment Design** | Supported | Supported | Supported | Supported | Supported | Supported
+**Community Support** |Dependent on adoption |Active community |Limited |Active community |Active community |Active community 
+**Data Analysis** | Tools available | | |Tools available| Limited| Tools available
+**Extensibility** | Custom libraries, extensions |Custom libraries, extensions|Basic, left to implementation|Custom libraries, extensions|Custom libraries, extensions|Custom libraries, extensions
+**Learning Curve** |Beginner to Intermediate |Moderate |Moderate |Moderate |Moderate |Moderate
+**Scalability** |Varies, implementation dependent| Moderate to High |Limited to Moderate ||Moderate |Moderate |High
 
