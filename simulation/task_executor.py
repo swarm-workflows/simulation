@@ -25,7 +25,7 @@ class TaskExecutor:
             )
 
             # Set CPU affinity for the subprocess
-            TaskExecutor.set_cpu_affinity(process, cpus)
+            #TaskExecutor.set_cpu_affinity(process, cpus)
 
             # Wait for the subprocess to complete
             process.wait()

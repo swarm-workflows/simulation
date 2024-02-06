@@ -1,3 +1,4 @@
+import enum
 import time
 from mpi4py import MPI
 from repast4py.network import UndirectedSharedNetwork
@@ -8,6 +9,11 @@ from simulation.base_agent import BaseAgent, AgentType
 from simulation.task_executor import TaskExecutor
 
 
+class AgentState(enum.Enum):
+    RUNNING = enum.auto()
+    IDLE = enum.auto()
+
+
 class ResourceAgent(BaseAgent):
     def __init__(self, agent_id: int, agent_type: AgentType, rank: int, resources: dict):
         super().__init__(agent_id, agent_type, rank)
@@ -16,55 +22,102 @@ class ResourceAgent(BaseAgent):
         self.msgs_sent_cnt = 0
         self.jobs_executed = 0
         self.child_agents = []  # List to keep track of child agents
+        self.state = AgentState.IDLE
+        self.job = None
+
+    def compute_child_agent_resources(self, requested_resources: dict):
+        # Get the requested resources
+        cpus_requested = requested_resources.get("cpus", 0)
+        nics_requested = requested_resources.get("nics", 0)
+        gpus_requested = requested_resources.get("gpus", 0)
+
+        # Check if requested resources are greater than available resources
+        if cpus_requested > len(self.resources.get("cpus", [])) or \
+                nics_requested > len(self.resources.get("nics", [])) or \
+                gpus_requested > len(self.resources.get("gpus", [])):
+            return None  # or handle the case according to your requirements
+
+        # Allocate requested resources
+        requested_resources = {
+            "cpus": self.resources.get("cpus", [])[:cpus_requested],
+            "nics": self.resources.get("nics", [])[:nics_requested],
+            "gpus": self.resources.get("gpus", [])[:gpus_requested]
+        }
+
+        # Update available resources
+        self.resources["cpus"] = self.resources.get("cpus", [])[cpus_requested:]
+        self.resources["nics"] = self.resources.get("nics", [])[nics_requested:]
+        self.resources["gpus"] = self.resources.get("gpus", [])[gpus_requested:]
+
+        return requested_resources
 
     def allocate_resources(self, job: Job):
-        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.uid_rank, job.resources)
+        child_resources = self.compute_child_agent_resources(requested_resources=job.get_resources())
+        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.uid_rank, child_resources)
+        child_agent.job = job
         self.child_agents.append(child_agent)
         return child_agent
 
-    def find_and_execute_job(self):
+    def find_and_allocate_jobs(self):
+        # Recover resources back from Idle agents
+        # Iterate through child agents and recover resources from IDLE agents
+        for child_agent in self.child_agents:
+            if child_agent.state == AgentState.IDLE:
+                # Add recovered resources back to the parent agent
+                self.resources["cpus"].extend(child_agent.resources.get("cpus", []))
+                self.resources["nics"].extend(child_agent.resources.get("nics", []))
+                self.resources["gpus"].extend(child_agent.resources.get("gpus", []))
+
+                # Remove the idle child agent from the list
+                self.child_agents.remove(child_agent)
+                print(f"Recovered resources from IDLE agent: {child_agent}")
+
+        # Find a Matching Job
         job_found = JobQueue.get().find_matching_job(agent_resources=self.resources)
         if job_found is not None:
-            JobQueue.get().schedule_job(job_found)
-            print(f"Executing job: {job_found}")
+            try:
+                print(f"Trying to allocate job: {job_found}")
+                self.allocate_resources(job_found)
+                JobQueue.get().schedule_job(job_found)
+            except Exception as e:
+                print(f"Error allocating job: {job_found}, Error: {e}")
+
+    def execute_job(self):
+        if self.job is not None and self.state == AgentState.IDLE:
+            self.state = AgentState.RUNNING
+            print(f"Executing job: {self.job}")
 
             try:
                 total_execution_time = 0.0
+                # Run the job commands sequentially
+                for command in self.job.get_commands():
+                    start_time = time.time()
 
-                # Check if child agents need to be spawned
-                if job_found.resources != self.resources:
-                    child_agent = self.allocate_resources(job_found)
-                    child_agent.find_and_execute_job()  # Execute the job using the child agent
-                else:
-                    # Run the job commands sequentially
-                    for command in job_found.get_commands():
-                        start_time = time.time()
+                    return_code = TaskExecutor.run_command(command, cpus=self.resources.get("cpus", []))
 
-                        return_code = TaskExecutor.run_command(command, cpus=self.resources.get("cpus", []))
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    total_execution_time += elapsed_time
 
-                        end_time = time.time()
-                        elapsed_time = end_time - start_time
-                        total_execution_time += elapsed_time
+                    print(f"Command: {command} executed with return code: {return_code}, "
+                          f"Elapsed Time: {elapsed_time:.2f} seconds")
 
-                        print(f"Command: {command} executed with return code: {return_code}, "
-                              f"Elapsed Time: {elapsed_time:.2f} seconds")
+                JobQueue.get().mark_job_completed(self.job)
+                print(f"{self.job} completed, Total Execution Time: {total_execution_time:.2f} seconds")
+                print()
+                print()
 
-                    JobQueue.get().mark_job_completed(job_found)
-                    print(f"{job_found} completed, Total Execution Time: {total_execution_time:.2f} seconds")
-                    print()
-                    print()
-
-                    self.jobs_executed += 1
+                self.jobs_executed += 1
             except Exception as e:
-                print(f"Error executing job: {job_found}, Error: {e}")
+                print(f"Error executing job: {self.job}, Error: {e}")
+            self.job = None
+            self.state = AgentState.IDLE
 
     def step(self):
-        self.find_and_execute_job()
-        # Check and collect resources from child agents
-        for child_agent in self.child_agents:
-            child_agent.find_and_execute_job()  # Execute jobs using child agents
-            # Collect resources back from child agent (assuming all resources go back to the parent)
-            self.resources = child_agent.resources
+        self.find_and_allocate_jobs()
+        for c in self.child_agents:
+            print(f"Executing child: {c}")
+            c.execute_job()
 
 
 if __name__ == '__main__':
@@ -88,10 +141,8 @@ if __name__ == '__main__':
     job_queue.add_job(job2)
     if rank == 0:
         job_queue.add_job(job3)
-        print(f"KOMAL --- Rank: 0 {job_queue}")
     else:
         job_queue.add_job(job4)
-        print(f"KOMAL --- Rank: 1 {job_queue}")
 
     resources = [{"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},
                  {"cpus": [1, 2], "gpus": [], "nic_cards": ["localhost"]},

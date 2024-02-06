@@ -1,6 +1,6 @@
+import json
 import threading
 import time
-import psutil
 from confluent_kafka import Consumer, KafkaError
 from mpi4py import MPI
 from repast4py.network import UndirectedSharedNetwork
@@ -9,6 +9,7 @@ from repast4py.schedule import Schedule
 from simulation.job_queue import JobQueue, Job
 from simulation.base_agent import AgentType
 from simulation.resource_agent import ResourceAgent
+from simulation.utils import Utils
 
 
 class HostController:
@@ -19,14 +20,6 @@ class HostController:
         self.scheduler = Schedule()
         self.comm = MPI.COMM_WORLD
         self.network = UndirectedSharedNetwork('resource_agent_nw', self.comm)
-
-    def get_system_resources(self):
-        cpu_count = psutil.cpu_count(logical=False)
-        nic_count = len(psutil.net_if_addrs())
-        gpu_count = 0
-
-        result = {"cpus": list(range(1, cpu_count + 1)), "nics": list(range(1, nic_count + 1)), "gpus": list(range(1, gpu_count + 1))}
-        return result
 
     def read_kafka_jobs(self):
         conf = {
@@ -58,29 +51,25 @@ class HostController:
             consumer.close()
 
     def parse_job_info(self, job_info):
-        job_data = {
-            "resources": {"cpus": 1, "gpus": 0, "nics": 0},
-            "commands": [f"python3 -m agents.jobs.cpu_computation"]
-        }
-        return job_data
+        return json.loads(job_info)
 
     def populate_job_queue(self, job_data):
         job_queue = JobQueue.get()
-        job = Job(resources=job_data["resources"], commands=job_data["commands"])
+        job = Job(resources=job_data.get("resources"), commands=job_data.get("commands"))
         job_queue.add_job(job)
 
     def start(self):
         kafka_thread = threading.Thread(target=self.read_kafka_jobs, daemon=True)
         kafka_thread.start()
 
-        system_resources = self.get_system_resources()
-        resource_agent = ResourceAgent(0, AgentType.Resource, 0, system_resources)
+        system_resources = Utils.get_system_resources()
+        resource_agent = ResourceAgent(0, AgentType.Leader, 0, system_resources)
 
         self.network.add(agent=resource_agent)
 
         self.scheduler.schedule_repeating_event(1.0, 1.0, lambda agent=resource_agent: agent.step())
 
-        steps = 10
+        steps = 1000
         for _ in range(steps):
             self.scheduler.execute()
             time.sleep(1.0)
