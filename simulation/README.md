@@ -1,32 +1,33 @@
-# Swarm Agent Simulation
-This package contains a simulation for a SWARM Agent using the [repast4-py](https://repast.github.io/) framework.
-It implements a basic distributed resource allocation algorithm based on the design shown below:
+# Simulating Swarm Agents
+Within this package lies a simulation for a SWARM Agent, utilizing the repast4-py framework. The simulation incorporates a fundamental distributed resource allocation algorithm, as illustrated below:
+
 ![Design Overview](./images/swarm-agent.png)
 
-## Design Overview
-- Each host runs a Resource Agent (RA) which has complete information of all the resources available on that host.
-- RA does following:
-  - Agent with Rank 0 runs as Leader Agent
-  - RA picks a job from the Job Queue (Kafka topic) matching the resources available to RA. 
-  - RA finds an idle Child Agent (CA) and allocates resources to CA and marks CA as running.
-  - RA sends the  resource and job info to CA.
-  - RA processes incoming Status message from CA to redeem any allocated resources and updates CA state.
-- CA does following:
-  - Agent with Rank > 0 runs as Child Agent
-  - CA runs the job.
-  - CA sends Status message back to RA containing state information.
+## Overview of Design
+- Each host operates a Resource Agent (RA) equipped with comprehensive information about all available resources on that host.
+- RA performs the following tasks:
+  - The Agent with Rank 0 functions as the Leader Agent.
+  - RA selects a job from the Job Queue (Kafka topic) that matches the resources available to RA.
+  - RA identifies an idle Child Agent (CA), allocates resources to the CA, and marks the CA as running.
+  - RA transmits resource and job information to the CA.
+  - RA processes incoming Status messages from the CA to release any allocated resources and updates the CA's state.
+- CA carries out the following actions:
+  - The Agent with Rank > 0 operates as the Child Agent.
+  - CA executes the assigned job.
+  - CA sends a Status message back to RA containing state information.
+
 ![Agent Communication](./images/agent-comm.png)
 
 ## Usage
-Swarm Agent on a host can be launched via:
-` mpiexec -n 4 python -m simulation.host_controller`
+Launch the Swarm Agent on a host using the following command:
+`mpiexec -n 4 python -m simulation.host_controller`
 
-Jobs can be added to the Job Queue via Job Producer:
+Add jobs to the Job Queue using the Job Producer:
 `python job_producer.py`
 
 ## Tests
-MPI message exchange helper can be tested via:
+Test the MPI message exchange helper with the following command:
 ` mpiexec -n 2 python -m simulation.tests.message_tests`
 
 ## Limitations
-This simulation tries to use Repast framework but doesn't benefit much from it and can be implemented without Repast.
+While this simulation makes use of the Repast framework, it may not derive significant benefits from it and could be implemented without Repast.
