@@ -37,7 +37,7 @@ def main():
 
     try:
         # Produce job information to Kafka topic
-        for x in range(100):
+        for x in range(10):
             produce_job_information(producer, kafka_topic, job_data1)
             produce_job_information(producer, kafka_topic, job_data2)
 

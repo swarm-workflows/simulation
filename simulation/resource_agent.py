@@ -6,6 +6,7 @@ from repast4py.schedule import Schedule, PriorityType
 
 from simulation.job_queue import JobQueue, Job
 from simulation.base_agent import BaseAgent, AgentType
+from simulation.message import MessageHelper
 from simulation.task_executor import TaskExecutor
 
 
@@ -21,9 +22,8 @@ class ResourceAgent(BaseAgent):
         self.msgs_rcvd_cnt = 0
         self.msgs_sent_cnt = 0
         self.jobs_executed = 0
-        self.child_agents = []  # List to keep track of child agents
+        self.child_agents = {}  # List to keep track of child agents
         self.state = AgentState.IDLE
-        self.job = None
 
     def compute_child_agent_resources(self, requested_resources: dict):
         # Get the requested resources
@@ -51,46 +51,17 @@ class ResourceAgent(BaseAgent):
 
         return requested_resources
 
-    def allocate_resources(self, job: Job):
-        child_resources = self.compute_child_agent_resources(requested_resources=job.get_resources())
-        child_agent = ResourceAgent(len(self.child_agents), AgentType.Resource, self.uid_rank, child_resources)
-        child_agent.job = job
-        self.child_agents.append(child_agent)
-        return child_agent
-
-    def find_and_allocate_jobs(self):
-        # Recover resources back from Idle agents
-        # Iterate through child agents and recover resources from IDLE agents
-        for child_agent in self.child_agents:
-            if child_agent.state == AgentState.IDLE:
-                # Add recovered resources back to the parent agent
-                self.resources["cpus"].extend(child_agent.resources.get("cpus", []))
-                self.resources["nics"].extend(child_agent.resources.get("nics", []))
-                self.resources["gpus"].extend(child_agent.resources.get("gpus", []))
-
-                # Remove the idle child agent from the list
-                self.child_agents.remove(child_agent)
-                print(f"Recovered resources from IDLE agent: {child_agent}")
-
-        # Find a Matching Job
-        job_found = JobQueue.get().find_matching_job(agent_resources=self.resources)
-        if job_found is not None:
-            try:
-                print(f"Trying to allocate job: {job_found}")
-                self.allocate_resources(job_found)
-                JobQueue.get().schedule_job(job_found)
-            except Exception as e:
-                print(f"Error allocating job: {job_found}, Error: {e}")
-
-    def execute_job(self):
-        if self.job is not None and self.state == AgentState.IDLE:
+    def execute_job(self, job: dict):
+        if self.state == AgentState.IDLE:
             self.state = AgentState.RUNNING
-            print(f"Executing job: {self.job}")
+            job_obj = Job(resources=job.get("resources"),
+                          commands=job.get("commands"))
+            print(f"{self}  executing job: {job_obj}")
 
             try:
                 total_execution_time = 0.0
                 # Run the job commands sequentially
-                for command in self.job.get_commands():
+                for command in job_obj.get_commands():
                     start_time = time.time()
 
                     return_code = TaskExecutor.run_command(command, cpus=self.resources.get("cpus", []))
@@ -102,22 +73,77 @@ class ResourceAgent(BaseAgent):
                     print(f"Command: {command} executed with return code: {return_code}, "
                           f"Elapsed Time: {elapsed_time:.2f} seconds")
 
-                JobQueue.get().mark_job_completed(self.job)
-                print(f"{self.job} completed, Total Execution Time: {total_execution_time:.2f} seconds")
+                print(f"Job completed, Total Execution Time: {total_execution_time:.2f} seconds")
                 print()
                 print()
 
                 self.jobs_executed += 1
             except Exception as e:
-                print(f"Error executing job: {self.job}, Error: {e}")
-            self.job = None
+                print(f"Error executing job: {job}, Error: {e}")
             self.state = AgentState.IDLE
 
+    def redeem_resources_from_child_agent(self, incoming_resources: dict):
+        print(f"Redeeming CA resources: {incoming_resources}")
+        self.resources["cpus"].extend(incoming_resources.get("cpus", []))
+        self.resources["nics"].extend(incoming_resources.get("nics", []))
+        self.resources["gpus"].extend(incoming_resources.get("gpus", []))
+
+    def find_idle_child_agent(self):
+        for info in self.child_agents.values():
+            if info["state"] == AgentState.IDLE:
+                return info
+
     def step(self):
-        self.find_and_allocate_jobs()
-        for c in self.child_agents:
-            print(f"Executing child: {c}")
-            c.execute_job()
+        #print(f"IN {self} STEP START")
+        if self.local_rank == 0:
+            # Resource Agent Status update Messages
+            if MPI.COMM_WORLD.Iprobe(source=MPI.ANY_SOURCE, tag=1):
+                ra_info = MessageHelper.receive_message(source=MPI.ANY_SOURCE, tag=1)
+                self.msgs_rcvd_cnt += 1
+                child_resources = ra_info.get("resources")
+                if len(child_resources):
+                    self.redeem_resources_from_child_agent(incoming_resources=child_resources)
+                ra_info.pop("resources")
+                # Save Child Agent info in child agents
+                self.child_agents[ra_info.get("rank")] = ra_info
+
+            idle_child_agent = self.find_idle_child_agent()
+            if idle_child_agent:
+                job_found = JobQueue.get().find_matching_job(agent_resources=self.resources)
+                if job_found:
+                    child_agent_resources = self.compute_child_agent_resources(requested_resources=
+                                                                               job_found.get_resources())
+
+                    print(f"Allocated {child_agent_resources} to CA {idle_child_agent} to execute {job_found}")
+                    data = {"job": job_found.to_dict(),
+                            "resources": child_agent_resources}
+                    JobQueue.get().schedule_job(job_found)
+                    dest_rank = idle_child_agent.get("rank")
+                    MessageHelper.send_message(data=data, destination=dest_rank, tag=0)
+                    self.msgs_sent_cnt += 1
+                    # Mark child agent as RUNNING
+                    self.child_agents[dest_rank]["state"] = AgentState.RUNNING
+        else:
+            # Listen for any jobs to execute from Leader
+            if MPI.COMM_WORLD.Iprobe(source=0, tag=0):
+                incoming_msg = MessageHelper.receive_message(source=0, tag=0)
+                self.msgs_rcvd_cnt += 1
+                job = incoming_msg.get("job")
+                self.resources = incoming_msg.get("resources")
+                self.execute_job(job=job)
+                # TODO inform leader of job status
+
+            # Inform Leader of the Child Agent Rank and state
+            data = {
+                "agent_id": self.id,
+                "rank": self.local_rank,
+                "state": self.state,
+                "resources": self.resources
+            }
+            MessageHelper.send_message(data=data, destination=0, tag=1)
+            self.msgs_sent_cnt += 1
+            self.resources.clear()
+        #print(f"IN {self} STEP STOP")
 
 
 if __name__ == '__main__':

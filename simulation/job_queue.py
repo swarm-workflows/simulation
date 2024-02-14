@@ -32,7 +32,12 @@ class Job:
         self.state = state
 
     def __str__(self):
-        return f"[Job: {self.commands} with Resources: {self.resources}, State: {self.state}]"
+        return f"[Job: {self.commands} with Resources: {self.resources}]"
+
+    def to_dict(self):
+        return {"resources": self.resources,
+                "commands": self.commands,
+                "state": self.state}
 
 
 class JobQueue:

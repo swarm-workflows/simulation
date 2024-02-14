@@ -1,4 +1,5 @@
 import json
+import random
 import threading
 import time
 from confluent_kafka import Consumer, KafkaError
@@ -22,6 +23,7 @@ class HostController:
         self.network = UndirectedSharedNetwork('resource_agent_nw', self.comm)
 
     def read_kafka_jobs(self):
+        print("Starting Kafka Thread")
         conf = {
             'bootstrap.servers': self.kafka_bootstrap_servers,
             'group.id': self.group_id,
@@ -49,6 +51,7 @@ class HostController:
                 self.populate_job_queue(job_data)
         finally:
             consumer.close()
+        print("Stopping Kafka Thread")
 
     def parse_job_info(self, job_info):
         return json.loads(job_info)
@@ -59,11 +62,19 @@ class HostController:
         job_queue.add_job(job)
 
     def start(self):
-        kafka_thread = threading.Thread(target=self.read_kafka_jobs, daemon=True)
-        kafka_thread.start()
+        rank = MPI.COMM_WORLD.Get_rank()
+        if rank == 0:
+            kafka_thread = threading.Thread(target=self.read_kafka_jobs, daemon=True)
+            kafka_thread.start()
 
-        system_resources = Utils.get_system_resources()
-        resource_agent = ResourceAgent(0, AgentType.Leader, 0, system_resources)
+            resources = Utils.get_system_resources()
+            agent_type = AgentType.Leader
+        else:
+            resources = {}
+            agent_type = AgentType.Resource
+        agent_id = random.randint(0, 100)
+
+        resource_agent = ResourceAgent(agent_id=agent_id, rank=rank, agent_type=agent_type, resources=resources)
 
         self.network.add(agent=resource_agent)
 
