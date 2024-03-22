@@ -40,7 +40,6 @@ def queue_agent(env: simpy.Environment, broker: MessageBroker, uid: int, jobs: L
 def worker_agent(env: simpy.Environment, broker: MessageBroker, uid: int, capacity: int, log_store: List[List[int]]):
     running_tasks = {}
     sent = False
-    wait_msg = None
     received_no_matching = False
     while True:
         if capacity > 0 and not sent:
@@ -48,26 +47,22 @@ def worker_agent(env: simpy.Environment, broker: MessageBroker, uid: int, capaci
             sent = True
 
         # wait for response or completion
-        if wait_msg is None:
-            wait_msg = broker.get_queue(uid).get()
-        if len(running_tasks) > 0:
-            min_end_time = min([rj.ends_at for rj in running_tasks.values()])
-            min_wait_time = max(0, min_end_time - env.now)
-            msg = yield wait_msg | env.timeout(min_wait_time)
-        else:
-            msg = yield wait_msg
+        with broker.get_queue(uid).get() as wait_msg:
+            if len(running_tasks) > 0:
+                min_end_time = min([rj.ends_at for rj in running_tasks.values()])
+                min_wait_time = max(0, min_end_time - env.now)
+                yield wait_msg | env.timeout(min_wait_time)
+            else:
+                yield wait_msg
         
-        if wait_msg in msg:
-            msg = msg[wait_msg]
-
-        if isinstance(msg, Job):
-            running_tasks[msg.uid] = RunningJob(env.now + msg.duration, msg)
-            capacity -= msg.cpu_req
-            sent = False
-            wait_msg = None
-        elif isinstance(msg, NoMatchingJobs):
-            received_no_matching = True # postpone flag cleanup
-            wait_msg = None
+            if wait_msg.triggered:
+                msg = wait_msg.value
+                if isinstance(msg, Job):
+                    running_tasks[msg.uid] = RunningJob(env.now + msg.duration, msg)
+                    capacity -= msg.cpu_req
+                    sent = False
+                elif isinstance(msg, NoMatchingJobs):
+                    received_no_matching = True # postpone flag cleanup
 
         released = False
         for running_job in list(running_tasks.values()):
@@ -96,5 +91,5 @@ def main(node_caps: List[int], jobs: List[Job]):
             writer.writerow(row)
 
 if __name__ == '__main__':
-    main(node_caps=[2] * 2,
+    main(node_caps=[2] * 1,
         jobs=[Job(i, 2, 1) for i in range(10)])
